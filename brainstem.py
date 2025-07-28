@@ -1,4 +1,4 @@
-# brainstem.py — v4.0
+# brainstem.py — v4.1
 # Unified brain loop, routing, chembus, coma logic, and now: the bootstrapper.
 
 import threading
@@ -10,11 +10,11 @@ from curiosity import CuriosityDrive
 from cstem import CStem
 
 BASE_WAVE_FREQUENCIES = {
-    'δ': 1,    # Delta
-    'θ': 4,    # Theta
-    'α': 8,    # Alpha
-    'β': 13,   # Beta
-    'γ': 30    # Gamma
+    'δ': 1,
+    'θ': 4,
+    'α': 8,
+    'β': 13,
+    'γ': 30
 }
 
 class Brainstem:
@@ -26,17 +26,10 @@ class Brainstem:
         self.wave_threads = {}
         self.lock = threading.RLock()
 
-        self.chemical_sources = []  # funcs that return chema dicts
+        self.chemical_sources = []
         self.active = True
 
         self._coma_triggered = False
-        self._coma_thresholds = {
-            'δ': 1,
-            'θ': 1,
-            'α': -1,
-            'β': -1,
-            'γ': -1
-        }
 
         # === Instantiate Mods ===
         self.subconscious = Subconscious()
@@ -46,19 +39,15 @@ class Brainstem:
         self._wire()
 
     def _wire(self):
-        # Register mods
         self.register_mod(self.subconscious)
         self.register_mod(self.curiosity)
         self.register_mod(self.cstem)
 
-        # Register electrical receptors
         self.register_subscriber(lambda m: self.subconscious.elrec(m), self.subconscious._on_tick)
         self.register_subscriber(lambda m: self.curiosity.elrec(m), self.curiosity._on_tick)
 
-        # Register chemical source
         self.register_chemical_source(self.cstem.emit)
 
-    # ======== BOOTSTRAP ========
     def start(self):
         self.active = True
         for wave in BASE_WAVE_FREQUENCIES:
@@ -69,7 +58,6 @@ class Brainstem:
     def stop(self):
         self.active = False
 
-    # ======== SYSTEM TICKING ========
     def _wave_loop(self, wave):
         interval = 1.0 / BASE_WAVE_FREQUENCIES[wave]
         while self.active:
@@ -110,7 +98,6 @@ class Brainstem:
             return 'α'
         return max(self.wave_amplitude, key=self.wave_amplitude.get)
 
-    # ======== ROUTING ========
     def register_subscriber(self, match_fn, callback):
         self.subscribers.append((match_fn, callback))
 
@@ -130,12 +117,12 @@ class Brainstem:
         if self._coma_triggered:
             return
 
-        match = all(
-            self.wave_amplitude.get(k, 0) == v
-            for k, v in self._coma_thresholds.items()
-        )
+        δ = self.wave_amplitude.get('δ', 0)
+        θ = self.wave_amplitude.get('θ', 0)
+        β = self.wave_amplitude.get('β', 0)
+        γ = self.wave_amplitude.get('γ', 0)
 
-        if match:
+        if δ >= 20 and θ >= 20 and β <= -20 and γ <= -20:
             self._coma_triggered = True
             self._shutdown_sequence()
 
