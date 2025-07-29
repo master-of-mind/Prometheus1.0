@@ -1,8 +1,8 @@
 # autonomics.py — v5.0
-# Handles wave tick rhythm and electrical routing only
+# Rhythmic wave engine and electrical signaling core (sacred)
 
-import threading
 import time
+import threading
 from collections import defaultdict
 
 BASE_WAVE_FREQUENCIES = {
@@ -15,49 +15,52 @@ BASE_WAVE_FREQUENCIES = {
 
 class Autonomics:
     def __init__(self):
-        self.subscribers = []
+        self.electrical_subscribers = []
         self.wave_amplitude = defaultdict(int)
-        self.wave_threads = {}
-        self.lock = threading.RLock()
+        self.mods = []
         self.active = True
+        self.lock = threading.RLock()
 
-    def set_amplitude(self, amp_dict):
-        with self.lock:
-            self.wave_amplitude = amp_dict
+    def start(self):
+        for wave, freq in BASE_WAVE_FREQUENCIES.items():
+            t = threading.Thread(target=self._oscillate, args=(wave, freq), daemon=True)
+            t.start()
+
+    def register_mod(self, mod):
+        self.mods.append(mod)
 
     def register_elrec(self, match_fn, callback):
-        self.subscribers.append((match_fn, callback))
+        self.electrical_subscribers.append((match_fn, callback))
 
-    def _get_dominant_wave(self):
-        if not self.wave_amplitude:
-            return 'α'
-        return max(self.wave_amplitude, key=self.wave_amplitude.get)
-
-    def _wave_loop(self, wave):
-        interval = 1.0 / BASE_WAVE_FREQUENCIES[wave]
+    def _oscillate(self, wave, freq):
+        interval = 1.0 / freq
         while self.active:
             time.sleep(interval)
             self._tick(wave)
 
     def _tick(self, wave):
         with self.lock:
-            dominant = self._get_dominant_wave()
-            if wave == dominant:
-                matrix = {w: self.wave_amplitude.get(w, 0) for w in BASE_WAVE_FREQUENCIES}
-                matrix[wave] += 1
-                self._push_packet(matrix)
+            self._update_wave_amplitudes()
+            matrix = self._generate_matrix(wave)
+            self._dispatch(matrix)
 
-    def _push_packet(self, matrix):
-        for match_fn, callback in self.subscribers:
+    def _update_wave_amplitudes(self):
+        summed = defaultdict(int)
+        for mod in self.mods:
+            if hasattr(mod, "get_chemical_pressure"):
+                pressure = mod.get_chemical_pressure()
+                for k, v in pressure.items():
+                    summed[k] += v
+        self.wave_amplitude = summed
+
+    def _generate_matrix(self, spike_wave):
+        matrix = {}
+        for wave in BASE_WAVE_FREQUENCIES:
+            amp = self.wave_amplitude.get(wave, 0)
+            matrix[wave] = amp + (1 if wave == spike_wave else 0)
+        return matrix
+
+    def _dispatch(self, matrix):
+        for match_fn, callback in self.electrical_subscribers:
             if match_fn(matrix):
                 callback(matrix)
-
-    def start(self):
-        self.active = True
-        for wave in BASE_WAVE_FREQUENCIES:
-            thread = threading.Thread(target=self._wave_loop, args=(wave,), daemon=True)
-            thread.start()
-            self.wave_threads[wave] = thread
-
-    def stop(self):
-        self.active = False
