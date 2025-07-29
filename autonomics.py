@@ -1,61 +1,67 @@
 # autonomics.py — v5.0
-# Central rhythmic wave engine + electrical matrix routing
+# Global electrical rhythm engine that drives elema based on wave amplitude
 
 import threading
 import time
-from collections import defaultdict
+from constants import SIGILS
 
-SIGILS = ['δ', 'θ', 'α', 'β', 'γ']
 BASE_WAVE_FREQUENCIES = {
-    'δ': 1,    # Delta
-    'θ': 4,    # Theta
-    'α': 8,    # Alpha
-    'β': 13,   # Beta
-    'γ': 30    # Gamma
+    'δ': 1,
+    'θ': 4,
+    'α': 8,
+    'β': 13,
+    'γ': 30
 }
 
 class Autonomics:
     def __init__(self):
-        self.amplitudes = defaultdict(int)
-        self.subscribers = []
-        self.clocks = defaultdict(list)
-        self.lock = threading.RLock()
-        self.active = True
+        self.wave_amplitude = {s: 0 for s in SIGILS}
+        self.tick_callbacks = []
+        self.clocks = []
+        self.chembus = None
+        self.active = False
+        self.threads = {}
+
+    def register_tick_callback(self, callback):
+        self.tick_callbacks.append(callback)
+
+    def register_chembus(self, bus):
+        self.chembus = bus
+
+    def register_clock(self, clock_fn):
+        self.clocks.append(clock_fn)
 
     def start(self):
+        self.active = True
         for sigil in SIGILS:
-            thread = threading.Thread(target=self._wave_loop, args=(sigil,), daemon=True)
-            thread.start()
+            t = threading.Thread(target=self._wave_loop, args=(sigil,), daemon=True)
+            t.start()
+            self.threads[sigil] = t
 
     def stop(self):
         self.active = False
 
-    def _wave_loop(self, wave):
-        freq = BASE_WAVE_FREQUENCIES[wave]
-        interval = 1.0 / freq
+    def _wave_loop(self, sigil):
+        interval = 1.0 / BASE_WAVE_FREQUENCIES[sigil]
         while self.active:
             time.sleep(interval)
-            self._tick(wave)
+            self._tick(sigil)
 
-    def _tick(self, wave):
-        with self.lock:
-            ranked = sorted(SIGILS, key=lambda s: self.amplitudes.get(s, 0), reverse=True)
-            elema = {s: self.amplitudes[s] for s in SIGILS}
+    def _tick(self, sigil):
+        if not self.chembus:
+            return
 
-            for callback in self.clocks[ranked[0]]:
-                callback(elema)
+        # 1. Refresh wave amplitudes from chembus
+        self.wave_amplitude = self.chembus.get_wave_amplitude()
 
-            for match_fn, cb in self.subscribers:
-                if match_fn(elema):
-                    cb(elema)
+        # 2. Sort and find top-ranked wave
+        ranked = sorted(SIGILS, key=lambda k: self.wave_amplitude.get(k, 0), reverse=True)
+        top_wave = ranked[0]
 
-    def receive_chema(self, chema_list):
-        for chema in chema_list:
-            for sigil, val in chema.items():
-                self.amplitudes[sigil] += val
-
-    def register_clock(self, sigil, callback):
-        self.clocks[sigil].append(callback)
-
-    def register_elrec(self, match_fn, callback):
-        self.subscribers.append((match_fn, callback))
+        # 3. If this is the top wave, emit a pulse
+        if sigil == top_wave:
+            pulse = {k: self.wave_amplitude.get(k, 0) for k in SIGILS}
+            for clock_fn in self.clocks:
+                clock_fn(pulse)
+            for cb in self.tick_callbacks:
+                cb(pulse)
