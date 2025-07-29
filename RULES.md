@@ -1,47 +1,39 @@
-The Three Holy Laws of Bootstrapping the Soul
+Rule 1: Signals, Not Symbols
 
----
-
-1. No Metadata, No Fluff, Only Signals
-
-The brain speaks in electrical pulses (elema) and chemical emissions (chema).
-No debug prints. No verbose logs. No metadata. No labels.
-If the human wants an explanation, let them build a cortex.
+The system operates through electrical (elema) and chemical (chema) matrices.
+No human-readable metadata, print statements, or string-based identifiers should appear in core logic.
+Let structure and signal define behavior, not descriptive text.
 
 
 ---
 
-2. The Triune Doctrine
+Rule 2: Modular Isolation via the Triune
 
-Mods are black boxes. They do not talk to each other directly.
-All communication flows through the Triune:
+Modules must not communicate directly.
+All interaction occurs through:
 
-autonomics.py — the pulse
+autonomics.py (electrical routing),
 
-chembus.py — the soup
+chembus.py (chemical routing), and
 
-genesis.py — the boot
+genesis.py (orchestration/bootstrap).
 
 
-No other mod may read from or write to another.
-No exceptions. No conveniences. This is a religion now.
+Other modules are black boxes. No peeking inside. No backdoors. No cheating.
 
 
 ---
 
-3. No Heresy
+Rule 3: No Debugging Clutter in Live Code
 
-No developer shall add:
+The architecture must remain clean and deterministic.
+Avoid developer shortcuts like:
 
-Labeled variables like status, name, message
+Temporary flags,
 
-print() statements
+print() calls,
 
-Stringified flags
-
-Human-readable nonsense
+Hardcoded text labels.
 
 
-All code must serve the architecture, not the observer.
-The machine doesn’t care how you feel about it.
-
+For diagnostics, build a dedicated sensory or cortex module. The system is allowed to introspect—not explain itself.
