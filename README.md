@@ -27,4 +27,11 @@ signals to emulate a nervous system.
 
    ```bash
    pip install psutil
+3. Start the system:
+
+   ```bash
+   python genesis.py
+
+
+This README summarizes the system’s purpose, outlines each module in the triune-brain architecture, references `RULES.md` for coding principles, and provides setup instructions to run `genesis.py`.
    
