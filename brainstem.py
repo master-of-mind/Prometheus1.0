@@ -1,68 +1,62 @@
-# brainstem.py — v2.0
-# System introspection module for internal state chema output
+# brainstem.py — v1.0
+# Internal sensor module. Emits chema during δ wave pulses.
 
-import psutil
-from random import randint
+import random
 
 class Brainstem:
-    def __init__(self):
-        self.chemical_pressure = {
-            'δ': 0,  # temperature
-            'θ': 0,  # cooling capacity
-            'α': 0,  # power level
-            'β': 0,  # memory availability
-            'γ': 0   # system integrity
+    """
+    Reports introspective system values (temp, cooling, power, RAM, system integrity)
+    Emits chemical signals to chembus on delta wave pulses.
+    """
+    def __init__(self, chembus):
+        self.chembus = chembus
+        self.sigils = ['δ', 'θ', 'α', 'β', 'γ']  # Sigils mapped to internal metrics
+
+    def register_with_autonomics(self, auto):
+        auto.register_subscriber(self._delta_only, self.on_tick)
+
+    def _delta_only(self, matrix):
+        return matrix.get('δ', 0) > 0  # Respond only to delta pulses
+
+    def on_tick(self, matrix):
+        # Simulated system status checks
+        temperature = self._check_temp()
+        cooling = self._check_cooling()
+        power = self._check_power()
+        ram = self._check_ram()
+        integrity = self._check_integrity()
+
+        # Map values to chema [-1, 0, 1] across sigils
+        chema = {
+            'δ': temperature,
+            'θ': cooling,
+            'α': power,
+            'β': ram,
+            'γ': integrity
         }
 
-    def get_chemical_pressure(self):
-        return dict(self.chemical_pressure)
+        self.chembus.receive(chema)
 
-    def emit(self):
-        self._update_state()
-        return dict(self.chemical_pressure)
+    # ==== Simulated Sensor Methods ====
+    def _check_temp(self):
+        # Placeholder logic; replace with real probe later
+        val = random.randint(25, 80)
+        return -1 if val > 70 else 1 if val < 40 else 0
 
-    def _update_state(self):
-        # Temperature → δ
-        temp = psutil.sensors_temperatures()
-        cpu_temp = temp.get('coretemp', [])[0].current if 'coretemp' in temp and temp['coretemp'] else 50
-        self.chemical_pressure['δ'] = self._classify_temperature(cpu_temp)
+    def _check_cooling(self):
+        # Placeholder fan speed range
+        val = random.randint(0, 100)
+        return 1 if val > 60 else -1 if val < 20 else 0
 
-        # Cooling → θ
-        self.chemical_pressure['θ'] = randint(0, 1)  # Placeholder
-
-        # Power → α
-        self.chemical_pressure['α'] = 1 if psutil.sensors_battery() and psutil.sensors_battery().power_plugged else 0
-
-        # Memory → β
-        mem = psutil.virtual_memory()
-        self.chemical_pressure['β'] = self._classify_memory(mem.available / mem.total)
-
-        # Integrity → γ
-        self.chemical_pressure['γ'] = self._check_system_integrity()
-
-    def _classify_temperature(self, temp):
-        if temp < 60:
-            return 1
-        elif 60 <= temp <= 75:
-            return 0
-        else:
-            return -1
-
-    def _classify_memory(self, ratio):
-        if ratio > 0.4:
-            return 1
-        elif ratio > 0.2:
-            return 0
-        else:
-            return -1
-
-    def _check_system_integrity(self):
-        # Placeholder for diagnostics; always returns 1 for now
+    def _check_power(self):
+        # Assume always plugged in for now
         return 1
 
-    def degrade_chemical_pressure(self):
-        for k in self.chemical_pressure:
-            if self.chemical_pressure[k] > 0:
-                self.chemical_pressure[k] -= 1
-            elif self.chemical_pressure[k] < 0:
-                self.chemical_pressure[k] += 1
+    def _check_ram(self):
+        # Placeholder: 80% used triggers warning
+        val = random.randint(30, 95)
+        return -1 if val > 85 else 1 if val < 50 else 0
+
+    def _check_integrity(self):
+        # Simulated random fault
+        return -1 if random.random() < 0.1 else 1
