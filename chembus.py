@@ -1,37 +1,37 @@
 # chembus.py — v5.0
-# Shared chemical routing and chrec logic
+# Global chemical bus and chrec matcher
 
-from collections import deque
-
-SIGILS = ['δ', 'θ', 'α', 'β', 'γ']
+from collections import Counter
+from constants import SIGILS
 
 class ChemBus:
     def __init__(self):
-        self.chema = deque()
-        self.chrec_registry = []
+        self.chema = []
 
-    def add(self, chemical):
-        if not self._is_zero(chemical):
-            self.chema.append(chemical)
+    def add(self, chema_batch):
+        for chem in chema_batch:
+            if not self._is_zero(chem):
+                self.chema.append(chem)
+
+    def get_wave_amplitude(self):
+        total = Counter()
+        for chem in self.chema:
+            for k, v in chem.items():
+                total[k] += v
+        return dict(total)
+
+    def chrec(self, match_fn):
+        matched = []
+        remaining = []
+
+        for chem in self.chema:
+            if match_fn(chem):
+                matched.append(chem)
+            else:
+                remaining.append(chem)
+
+        self.chema = remaining
+        return matched
 
     def _is_zero(self, chem):
         return all(v == 0 for v in chem.values())
-
-    def register_chrec(self, chrec_fn, callback):
-        self.chrec_registry.append((chrec_fn, callback))
-
-    def evaluate(self):
-        remaining = deque()
-        for chem in self.chema:
-            matched = False
-            for chrec_fn, callback in self.chrec_registry:
-                if chrec_fn(chem):
-                    callback(chem)
-                    matched = True
-                    break
-            if not matched:
-                remaining.append(chem)
-        self.chema = remaining
-
-    def get_all(self):
-        return list(self.chema)
