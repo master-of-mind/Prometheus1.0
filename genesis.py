@@ -1,23 +1,23 @@
-# genesis.py — v3.0
-# The holy invocation of life
+# genesis.py — v5.0
+# System bootstrapper: initializes the sacred triune and launches the core loop
 
 from autonomics import Autonomics
 from chembus import ChemBus
 from brainstem import Brainstem
 
 def main():
+    # === Create core systems ===
     bus = ChemBus()
-    auto = Autonomics()
-    stem = Brainstem()
+    core = Brainstem()
+    loop = Autonomics()
 
-    # Wire chembus into autonomics
-    auto.set_bus(bus)
+    # === Wire sacred triune ===
+    loop.register_chembus(bus)
+    core.register_chembus(bus)
+    core.register_autonomics(loop)
 
-    # Register brainstem as a chemical source
-    bus.register_source(stem.emit)
-
-    # Begin ticking loop
-    auto.start()
+    # === Start the loop ===
+    loop.start()
 
 if __name__ == "__main__":
     main()
