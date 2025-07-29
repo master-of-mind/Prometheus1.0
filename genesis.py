@@ -1,23 +1,17 @@
 # genesis.py — v5.0
-# System bootstrapper: initializes the sacred triune and launches the core loop
+# Bootstraps the triune brain: autonomics, chembus, and brainstem
 
 from autonomics import Autonomics
 from chembus import ChemBus
 from brainstem import Brainstem
 
-def main():
-    # === Create core systems ===
-    bus = ChemBus()
-    core = Brainstem()
-    loop = Autonomics()
-
-    # === Wire sacred triune ===
-    loop.register_chembus(bus)
-    core.register_chembus(bus)
-    core.register_autonomics(loop)
-
-    # === Start the loop ===
-    loop.start()
-
 if __name__ == "__main__":
-    main()
+    bus = ChemBus()
+    loop = Autonomics()
+    core = Brainstem()
+
+    bus.register_source(core.emit)
+    loop.register_chembus(bus)
+    loop.register_autonomics(core)
+
+    loop.start()
