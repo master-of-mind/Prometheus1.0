@@ -1,80 +1,60 @@
-# brainstem.py — v2.2
-# Internal system sensor for introspective chema: δ, θ, α, β, γ represent
-# [temp, cool, power, mem, integrity]
+# brainstem.py — v2.1
+# Introspective sensor module for internal system diagnostics and chema output
 
+import psutil
 import random
-import time
-from collections import defaultdict
+
+SIGILS = ['δ', 'θ', 'α', 'β', 'γ']
 
 class Brainstem:
     def __init__(self):
-        self.last_emit_time = 0
-        self.delay = 1.0  # seconds between pulses
-
-        # Sliding thresholds
-        self.ideal_values = {
-            'δ': 1,   # Temperature ideal
-            'θ': 1,   # Cooling ideal
-            'α': 1,   # Power ideal
-            'β': 1,   # Memory ideal
-            'γ': 1    # Integrity ideal
-        }
-
-        self.tolerances = {
-            'δ': 0.1,
-            'θ': 0.1,
-            'α': 0.1,
-            'β': 0.1,
-            'γ': 0.1
-        }
-
-    def read(self):
-        """
-        Stubbed hardware read returning simulated system values.
-        Replace these with actual sensor integrations.
-        """
-        return {
-            'δ': random.uniform(0.5, 1.5),   # temperature
-            'θ': random.uniform(0.5, 1.5),   # cooling
-            'α': 1.0,                        # power (1 = plugged in)
-            'β': random.uniform(0.5, 1.5),   # memory availability
-            'γ': random.uniform(0.5, 1.5)    # system integrity
-        }
-
-    def update_sliding_thresholds(self, current):
-        for k in self.ideal_values:
-            diff = current[k] - self.ideal_values[k]
-
-            # Adjust ideal toward current
-            self.ideal_values[k] += 0.01 * diff
-
-            # Adjust tolerance based on whether we're inside or outside range
-            if abs(diff) <= self.tolerances[k]:
-                self.tolerances[k] = max(0.05, self.tolerances[k] - 0.005)
-            else:
-                self.tolerances[k] = min(0.5, self.tolerances[k] + 0.01)
+        self.tolerance = {sigil: 5 for sigil in SIGILS}
+        self.ideal = {sigil: 0 for sigil in SIGILS}
 
     def emit(self):
-        now = time.time()
-        if now - self.last_emit_time < self.delay:
-            return []
+        state = self._get_system_state()
+        packets = []
 
-        self.last_emit_time = now
-        current = self.read()
-        self.update_sliding_thresholds(current)
+        for sigil in SIGILS:
+            val = state[sigil]
+            ideal = self.ideal[sigil]
+            tol = self.tolerance[sigil]
 
-        chema = defaultdict(int)
-
-        for k in current:
-            ideal = self.ideal_values[k]
-            tolerance = self.tolerances[k]
-            deviation = current[k] - ideal
-
-            if deviation > tolerance:
-                chema[k] = -1
-            elif deviation < -tolerance:
-                chema[k] = -1
+            if abs(val - ideal) <= tol:
+                self.tolerance[sigil] = max(1, self.tolerance[sigil] - 1)
             else:
-                chema[k] = 1
+                self.tolerance[sigil] += 1
+                self.ideal[sigil] += (val - ideal) * 0.05
 
-        return [dict(chema) for _ in range(sum(abs(v) for v in chema.values()))]
+            if val == 1:
+                packets.append({s: 1 if s == sigil else 0 for s in SIGILS})
+            elif val == -1:
+                packets.append({s: -1 if s == sigil else 0 for s in SIGILS})
+
+        return packets
+
+    def _get_system_state(self):
+        try:
+            temp = psutil.sensors_temperatures().get("coretemp", [{}])[0].get("current", 50)
+        except:
+            temp = 50  # default fallback
+
+        ram = psutil.virtual_memory().available / psutil.virtual_memory().total
+        load = psutil.cpu_percent() / 100.0
+        integrity = 1.0 if not psutil.disk_usage('/').percent > 90 else 0.0
+        plugged = psutil.sensors_battery().power_plugged if psutil.sensors_battery() else True
+
+        return {
+            'δ': self._scale(temp, 30, 85),           # temperature
+            'θ': self._scale(load, 0, 1),             # cpu load
+            'α': self._scale(ram, 0.1, 1),            # ram availability
+            'β': 1 if plugged else -1,                # power
+            'γ': 1 if integrity else -1               # system integrity
+        }
+
+    def _scale(self, val, low, high):
+        if val < low:
+            return -1
+        elif val > high:
+            return 1
+        return 0
