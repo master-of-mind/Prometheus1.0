@@ -1,60 +1,93 @@
-# brainstem.py — v2.1
-# Introspective sensor module for internal system diagnostics and chema output
+# brainstem.py — v5.0
+# Internal system monitor with chemical output
 
 import psutil
+from collections import defaultdict
 import random
 
 SIGILS = ['δ', 'θ', 'α', 'β', 'γ']
 
 class Brainstem:
     def __init__(self):
-        self.tolerance = {sigil: 5 for sigil in SIGILS}
-        self.ideal = {sigil: 0 for sigil in SIGILS}
+        self.ideal = {
+            'δ': 45,   # temperature
+            'θ': 1,    # cooling
+            'α': 1,    # power
+            'β': 500,  # memory
+            'γ': 1     # system integrity
+        }
+        self.tolerance = {
+            'δ': 5,
+            'θ': 1,
+            'α': 0,
+            'β': 100,
+            'γ': 0
+        }
+        self._tick = 0
+
+    def _get_temperature(self):
+        try:
+            temps = psutil.sensors_temperatures()
+            for sensor_list in temps.values():
+                for entry in sensor_list:
+                    if entry.current:
+                        return entry.current
+        except Exception:
+            pass
+        return 50 + random.randint(-2, 2)  # fallback stub
+
+    def _get_cooling(self):
+        try:
+            fans = psutil.sensors_fans()
+            return sum([fan.current for group in fans.values() for fan in group]) or 0
+        except Exception:
+            return 1 + random.randint(0, 2)
+
+    def _get_power(self):
+        try:
+            battery = psutil.sensors_battery()
+            return 1 if battery and battery.power_plugged else -1
+        except Exception:
+            return 1
+
+    def _get_memory(self):
+        return psutil.virtual_memory().available // (1024 * 1024)
+
+    def _get_integrity(self):
+        return 1  # Replace with actual check if needed
+
+    def _slide_ideal(self, current, target, weight=0.05):
+        return current + (target - current) * weight
 
     def emit(self):
-        state = self._get_system_state()
-        packets = []
+        self._tick += 1
+        chema_packets = []
 
-        for sigil in SIGILS:
-            val = state[sigil]
-            ideal = self.ideal[sigil]
-            tol = self.tolerance[sigil]
-
-            if abs(val - ideal) <= tol:
-                self.tolerance[sigil] = max(1, self.tolerance[sigil] - 1)
-            else:
-                self.tolerance[sigil] += 1
-                self.ideal[sigil] += (val - ideal) * 0.05
-
-            if val == 1:
-                packets.append({s: 1 if s == sigil else 0 for s in SIGILS})
-            elif val == -1:
-                packets.append({s: -1 if s == sigil else 0 for s in SIGILS})
-
-        return packets
-
-    def _get_system_state(self):
-        try:
-            temp = psutil.sensors_temperatures().get("coretemp", [{}])[0].get("current", 50)
-        except:
-            temp = 50  # default fallback
-
-        ram = psutil.virtual_memory().available / psutil.virtual_memory().total
-        load = psutil.cpu_percent() / 100.0
-        integrity = 1.0 if not psutil.disk_usage('/').percent > 90 else 0.0
-        plugged = psutil.sensors_battery().power_plugged if psutil.sensors_battery() else True
-
-        return {
-            'δ': self._scale(temp, 30, 85),           # temperature
-            'θ': self._scale(load, 0, 1),             # cpu load
-            'α': self._scale(ram, 0.1, 1),            # ram availability
-            'β': 1 if plugged else -1,                # power
-            'γ': 1 if integrity else -1               # system integrity
+        system = {
+            'δ': self._get_temperature(),
+            'θ': self._get_cooling(),
+            'α': self._get_power(),
+            'β': self._get_memory(),
+            'γ': self._get_integrity()
         }
 
-    def _scale(self, val, low, high):
-        if val < low:
-            return -1
-        elif val > high:
-            return 1
-        return 0
+        for sigil in SIGILS:
+            curr = system[sigil]
+            base = self.ideal[sigil]
+            tol = self.tolerance[sigil]
+
+            # Update ideal range over time
+            self.ideal[sigil] = self._slide_ideal(base, curr)
+
+            delta = curr - self.ideal[sigil]
+
+            if delta > tol:
+                packet = {s: 0 for s in SIGILS}
+                packet[sigil] = 1
+                chema_packets.append(packet)
+            elif delta < -tol:
+                packet = {s: 0 for s in SIGILS}
+                packet[sigil] = -1
+                chema_packets.append(packet)
+
+        return chema_packets
