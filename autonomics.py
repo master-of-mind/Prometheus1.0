@@ -1,10 +1,11 @@
 # autonomics.py — v5.0
-# Rhythmic wave engine and electrical signaling core (sacred)
+# Central rhythmic wave engine + electrical matrix routing
 
-import time
 import threading
+import time
 from collections import defaultdict
 
+SIGILS = ['δ', 'θ', 'α', 'β', 'γ']
 BASE_WAVE_FREQUENCIES = {
     'δ': 1,    # Delta
     'θ': 4,    # Theta
@@ -15,24 +16,22 @@ BASE_WAVE_FREQUENCIES = {
 
 class Autonomics:
     def __init__(self):
-        self.electrical_subscribers = []
-        self.wave_amplitude = defaultdict(int)
-        self.mods = []
-        self.active = True
+        self.amplitudes = defaultdict(int)
+        self.subscribers = []
+        self.clocks = defaultdict(list)
         self.lock = threading.RLock()
+        self.active = True
 
     def start(self):
-        for wave, freq in BASE_WAVE_FREQUENCIES.items():
-            t = threading.Thread(target=self._oscillate, args=(wave, freq), daemon=True)
-            t.start()
+        for sigil in SIGILS:
+            thread = threading.Thread(target=self._wave_loop, args=(sigil,), daemon=True)
+            thread.start()
 
-    def register_mod(self, mod):
-        self.mods.append(mod)
+    def stop(self):
+        self.active = False
 
-    def register_elrec(self, match_fn, callback):
-        self.electrical_subscribers.append((match_fn, callback))
-
-    def _oscillate(self, wave, freq):
+    def _wave_loop(self, wave):
+        freq = BASE_WAVE_FREQUENCIES[wave]
         interval = 1.0 / freq
         while self.active:
             time.sleep(interval)
@@ -40,27 +39,23 @@ class Autonomics:
 
     def _tick(self, wave):
         with self.lock:
-            self._update_wave_amplitudes()
-            matrix = self._generate_matrix(wave)
-            self._dispatch(matrix)
+            ranked = sorted(SIGILS, key=lambda s: self.amplitudes.get(s, 0), reverse=True)
+            elema = {s: self.amplitudes[s] for s in SIGILS}
 
-    def _update_wave_amplitudes(self):
-        summed = defaultdict(int)
-        for mod in self.mods:
-            if hasattr(mod, "get_chemical_pressure"):
-                pressure = mod.get_chemical_pressure()
-                for k, v in pressure.items():
-                    summed[k] += v
-        self.wave_amplitude = summed
+            for callback in self.clocks[ranked[0]]:
+                callback(elema)
 
-    def _generate_matrix(self, spike_wave):
-        matrix = {}
-        for wave in BASE_WAVE_FREQUENCIES:
-            amp = self.wave_amplitude.get(wave, 0)
-            matrix[wave] = amp + (1 if wave == spike_wave else 0)
-        return matrix
+            for match_fn, cb in self.subscribers:
+                if match_fn(elema):
+                    cb(elema)
 
-    def _dispatch(self, matrix):
-        for match_fn, callback in self.electrical_subscribers:
-            if match_fn(matrix):
-                callback(matrix)
+    def receive_chema(self, chema_list):
+        for chema in chema_list:
+            for sigil, val in chema.items():
+                self.amplitudes[sigil] += val
+
+    def register_clock(self, sigil, callback):
+        self.clocks[sigil].append(callback)
+
+    def register_elrec(self, match_fn, callback):
+        self.subscribers.append((match_fn, callback))
