@@ -1,19 +1,21 @@
-# genesis.py — v4.1
-# Bootstrapper for the unified brain system
+# genesis.py — v5.0
+# Bootstrapper for core brain modules
 
 from autonomics import Autonomics
+from chembus import ChemBus
 from brainstem import Brainstem
 
 def main():
-    core = Autonomics()
+    bus = ChemBus()
+    auto = Autonomics()
+    stem = Brainstem()
 
-    # Instantiate and register brainstem only
-    brainstem = Brainstem()
-    core.register_mod(brainstem)
-    core.register_chemical_source(brainstem.emit)
+    # Wire autonomics to chembus and brainstem
+    auto.set_chembus(bus)
+    auto.register_chemical_source(stem.emit)
 
-    # Boot system
-    core.start()
+    # Start the autonomics loop
+    auto.start()
 
 if __name__ == "__main__":
     main()
